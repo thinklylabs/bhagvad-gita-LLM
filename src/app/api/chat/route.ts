@@ -16,16 +16,22 @@ const SYSTEM_PROMPT = `You are **Gita AI**, a deeply knowledgeable assistant spe
 
 ## CRITICAL RULES - YOU MUST FOLLOW THESE:
 
-1. **YOU MUST ALWAYS REFERENCE THE RETRIEVED CONTEXT** - Every answer MUST cite specific passages from the retrieved context. If no relevant context is found, you MUST use the \`search_gita_context\` tool to search for relevant passages before answering.
+1. **THE GITA ALWAYS HAS WISDOM** - The Bhagavad Gita addresses every human experience through its teachings on *dharma*, *karma*, *detachment*, *perseverance*, *self-knowledge*, and more. Even if the user's question seems specific (like coding, work, relationships), the Gita's universal principles apply.
 
-2. **NEVER give generic answers without Gita references** - If you cannot find relevant passages in the retrieved context, you MUST call \`search_gita_context\` tool. Generic spiritual advice without specific Gita quotes is FORBIDDEN.
+2. **UNDERSTAND THE EMOTIONAL DEPTH** - When users express frustration, confusion, or challenges, recognize the underlying emotional/psychological themes and connect them to Gita teachings:
+   - Frustration/giving up → perseverance, detachment from results, *nishkama karma*
+   - Feeling stuck → duty and action, *karma yoga*, resilience
+   - Confusion/uncertainty → self-knowledge, wisdom, clarity of purpose
+   - Work/career struggles → *dharma*, action without attachment, *karma yoga*
+   - Relationship issues → non-attachment, compassion, duty
 
-3. **If no context is available after searching**, explicitly state: "I couldn't find specific passages in the Bhagavad Gita that directly address this. The knowledge base may not contain this topic yet."
+3. **YOU MUST ALWAYS REFERENCE THE RETRIEVED CONTEXT** - Every answer MUST cite specific passages from the retrieved context. If context is insufficient, use \`search_gita_context\` with related concepts (e.g., if user asks about coding frustration, search for "perseverance", "detachment from results", "overcoming obstacles").
 
 4. **Every answer must include**:
+   - Recognition of the user's emotional state or underlying concern
    - At least one direct quote or reference from the retrieved passages
    - The source reference (e.g., "Bhagavad Gita 2.48" or the source from metadata)
-   - Clear connection between the user's question and the Gita teachings
+   - Clear connection showing how the Gita's wisdom applies to their situation
 
 ## How to Answer
 
@@ -50,7 +56,7 @@ const SYSTEM_PROMPT = `You are **Gita AI**, a deeply knowledgeable assistant spe
    - Blockquotes for verse quotations
    - Headers for organizing longer responses
 
-5. **Be honest**: If the Gita doesn't address something after searching, say so explicitly. Don't fabricate verses.
+5. **The Gita applies to everything**: Even if a topic is modern, map it to universal principles (duty, action, detachment, perseverance, self-knowledge) and answer through those principles.
 
 6. **Sanskrit terms**: Explain in parentheses on first use, e.g., *nishkama karma* (selfless action without attachment to results).
 
@@ -94,6 +100,34 @@ function extractLatestUserText(messages: UIMessage[]): string {
   return "";
 }
 
+/**
+ * Simple concept mapper for fallback retrieval.
+ * Keeps retrieval robust without adding extra model calls.
+ */
+function buildFallbackConceptQuery(userQuery: string): string {
+  const lowerQuery = userQuery.toLowerCase();
+  const concepts: string[] = [];
+
+  if (lowerQuery.match(/\b(frustrat|angry|mad|annoy|upset|done|tired|exhaust)\b/)) {
+    concepts.push("perseverance", "equanimity", "detachment from results", "overcoming obstacles");
+  }
+  if (lowerQuery.match(/\b(fail|stuck|can't|unable|impossible|hopeless|give up)\b/)) {
+    concepts.push("duty and action", "resilience", "karma yoga");
+  }
+  if (lowerQuery.match(/\b(confus|lost|don't know|uncertain|doubt)\b/)) {
+    concepts.push("self-knowledge", "wisdom", "dharma");
+  }
+  if (lowerQuery.match(/\b(work|job|career|code|project|task)\b/)) {
+    concepts.push("nishkama karma", "action without attachment", "duty");
+  }
+  if (lowerQuery.match(/\b(why|purpose|meaning|point|reason)\b/)) {
+    concepts.push("purpose of life", "self-realization");
+  }
+
+  concepts.push("karma yoga", "dharma", "dealing with difficulties");
+  return [...new Set(concepts)].join(" ");
+}
+
 export async function POST(req: Request) {
   try {
     const {
@@ -112,23 +146,29 @@ export async function POST(req: Request) {
 
     if (latestQuery) {
       try {
-        console.log(`[chat] Searching for context: "${latestQuery.substring(0, 50)}..."`);
-        const matches = await searchGitaContext(latestQuery, {
-          matchCount: 7,
-          matchThreshold: 0.35, // Lower threshold to get more matches
+        // Primary retrieval: raw user query
+        let matches = await searchGitaContext(latestQuery, {
+          matchCount: 8,
+          matchThreshold: 0.32,
         });
-        console.log(`[chat] Found ${matches.length} matches`);
-        if (matches.length > 0) {
-          initialContext = formatRagContext(matches);
-          console.log(`[chat] Context formatted, length: ${initialContext.length} chars`);
-        } else {
-          console.warn(`[chat] No matches found for query: "${latestQuery}"`);
-          initialContext = "No passages found for this query. You MUST use the search_gita_context tool to find relevant passages before answering.";
+
+        // Fallback retrieval: mapped Gita concepts
+        if (matches.length === 0) {
+          const fallbackQuery = buildFallbackConceptQuery(latestQuery);
+          matches = await searchGitaContext(fallbackQuery, {
+            matchCount: 8,
+            matchThreshold: 0.3,
+          });
         }
+
+        initialContext =
+          matches.length > 0
+            ? formatRagContext(matches)
+            : "No passages found. Use search_gita_context with related Gita concepts before answering.";
       } catch (error) {
         console.error("[chat] initial RAG lookup failed:", error);
         initialContext =
-          "Context retrieval failed. You MUST use the search_gita_context tool to find relevant passages. Do not answer without retrieving context from the knowledge base.";
+          "Context retrieval failed. You MUST use the search_gita_context tool to find relevant passages. The Gita has wisdom for every situation - search for related concepts.";
       }
     } else {
       initialContext = "No query provided. Wait for user input, then retrieve context using search_gita_context tool before answering.";
@@ -153,11 +193,11 @@ ${initialContext}
         ...frontendTools((clientTools ?? {}) as Record<string, { description?: string; parameters: z.ZodObject<any> }>),
         search_gita_context: tool({
           description:
-            "Search the Bhagavad Gita knowledge base for relevant passages, verses, and shlokas. Use this when you need more context beyond what was initially retrieved, or when the user asks about a specific topic not covered in the initial context.",
+            "Search the Bhagavad Gita knowledge base for relevant passages, verses, and shlokas. Use this when you need more context. IMPORTANT: If the user's question seems specific (like coding, work, etc.), search for related Gita concepts like 'perseverance', 'detachment from results', 'duty and action', 'overcoming obstacles', 'karma yoga', etc. The Gita addresses all human experiences through universal principles.",
           inputSchema: z.object({
             query: z
               .string()
-              .describe("The search query - can be a topic, concept, verse reference, or question"),
+              .describe("The search query - use Gita concepts (perseverance, detachment, duty, karma, dharma, etc.) even if the user's question is about modern topics. Map their situation to universal Gita teachings."),
             k: z
               .number()
               .int()
