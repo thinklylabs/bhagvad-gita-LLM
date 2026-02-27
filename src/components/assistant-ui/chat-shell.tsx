@@ -34,7 +34,11 @@ import { Separator } from "@/components/ui/separator";
 
 // Shows a pulsing dot only on the specific thread item that is both active AND currently generating.
 function RunningIndicator() {
-  const isMain = useAuiState((s) => s.threadListItem.isMain);
+  const isMain = useAuiState(
+    (s) =>
+      (s.threadListItem as { id?: string }).id ===
+      (s.thread as { id?: string }).id
+  );
   const isRunning = useAuiState((s) => s.thread.isRunning);
   if (!isMain || !isRunning) return null;
   return (

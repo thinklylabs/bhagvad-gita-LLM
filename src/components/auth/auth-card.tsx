@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,7 +37,6 @@ function getPasswordStrength(password: string): {
 
 export function AuthCard() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("signin");
   const [view, setView] = useState<View>("auth");
   const [firstName, setFirstName] = useState("");
@@ -83,7 +82,7 @@ export function AuthCard() {
 
         if (signInError) throw signInError;
         toast.success("Signed in successfully");
-        const prompt = searchParams.get("prompt");
+        const prompt = new URLSearchParams(window.location.search).get("prompt");
         router.push(
           prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard"
         );

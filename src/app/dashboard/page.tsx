@@ -5,7 +5,7 @@ import {
   AssistantChatTransport,
   useChatRuntime,
 } from "@assistant-ui/react-ai-sdk";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { ChatShell } from "@/components/assistant-ui/chat-shell";
@@ -34,7 +34,6 @@ function AuthenticatedChat({ session }: { session: Session }) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const welcomedUserIds = useRef<Set<string>>(new Set());
@@ -44,7 +43,7 @@ export default function DashboardPage() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) {
-        const prompt = searchParams.get("prompt");
+        const prompt = new URLSearchParams(window.location.search).get("prompt");
         router.replace(
           prompt ? `/auth?prompt=${encodeURIComponent(prompt)}` : "/auth"
         );
@@ -58,7 +57,7 @@ export default function DashboardPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!nextSession) {
-        const prompt = searchParams.get("prompt");
+        const prompt = new URLSearchParams(window.location.search).get("prompt");
         router.replace(
           prompt ? `/auth?prompt=${encodeURIComponent(prompt)}` : "/auth"
         );
@@ -69,7 +68,7 @@ export default function DashboardPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [router, searchParams]);
+  }, [router]);
 
   useEffect(() => {
     if (!session) return;

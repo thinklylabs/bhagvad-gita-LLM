@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { AuthCard } from "@/components/auth/auth-card";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 export default function AuthPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,7 +15,7 @@ export default function AuthPage() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        const prompt = searchParams.get("prompt");
+        const prompt = new URLSearchParams(window.location.search).get("prompt");
         router.replace(
           prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard"
         );
@@ -24,7 +23,7 @@ export default function AuthPage() {
       }
       setLoading(false);
     });
-  }, [router, searchParams]);
+  }, [router]);
 
   if (loading) {
     return (
