@@ -173,6 +173,7 @@ export function AuthCard() {
                 {loading ? "Sending..." : "Send reset link"}
               </Button>
               <Button
+                type="button"
                 variant="ghost"
                 className="w-full"
                 onClick={() => setView("auth")}
@@ -259,6 +260,7 @@ export function AuthCard() {
                   </div>
                   <div className="flex justify-end">
                     <Button
+                      type="button"
                       variant="link"
                       className="h-auto p-0 text-xs text-stone-400 hover:text-stone-200"
                       onClick={() => setView("forgot")}
