@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Gita AI - Ask the Bhagavad Gita",
@@ -27,8 +27,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-stone-950 min-h-screen">
-        <Navbar />
         {children}
+        <Toaster />
       </body>
     </html>
   );
