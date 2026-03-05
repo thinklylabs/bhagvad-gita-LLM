@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AssistantRuntimeProvider,
   unstable_useRemoteThreadListRuntime,
@@ -51,6 +52,7 @@ type PaymentHistoryItem = {
 };
 
 function SettingsContent({ session }: { session: Session }) {
+  const router = useRouter();
   const supabase = useMemo(() => getBrowserSupabase(), []);
   const [loading, setLoading] = useState(true);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
@@ -59,6 +61,7 @@ function SettingsContent({ session }: { session: Session }) {
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
+  const hasActiveSubscription = billing?.hasAccess === true;
 
   useEffect(() => {
     let isMounted = true;
@@ -253,12 +256,20 @@ function SettingsContent({ session }: { session: Session }) {
               <Button
                 variant="outline"
                 className="border-stone-700 bg-stone-950 text-stone-200 hover:bg-stone-800"
-                onClick={() => void cancelSubscription()}
-                disabled={cancellingSubscription}
+                onClick={() => {
+                  if (hasActiveSubscription) {
+                    void cancelSubscription();
+                    return;
+                  }
+                  router.push("/pricing");
+                }}
+                disabled={hasActiveSubscription && cancellingSubscription}
               >
-                {cancellingSubscription
-                  ? "Cancelling..."
-                  : "Cancel subscription"}
+                {hasActiveSubscription
+                  ? cancellingSubscription
+                    ? "Cancelling..."
+                    : "Cancel subscription"
+                  : "Upgrade"}
               </Button>
             </CardContent>
           </Card>

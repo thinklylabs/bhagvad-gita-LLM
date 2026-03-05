@@ -9,7 +9,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { formatRagContext, searchGitaContext } from "@/lib/rag";
-import { hasActiveEntitlement } from "@/lib/billing/entitlement";
+import { FREE_MESSAGE_LIMIT, getFreeMessageUsage, hasActiveEntitlement } from "@/lib/billing/entitlement";
 import { requireRequestUserId } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
@@ -133,21 +133,6 @@ function buildFallbackConceptQuery(userQuery: string): string {
 export async function POST(req: Request) {
   try {
     const userId = await requireRequestUserId(req);
-    const canAccess = await hasActiveEntitlement(userId);
-
-    if (!canAccess) {
-      return new Response(
-        JSON.stringify({
-          error: "Subscription required",
-          code: "PAYWALL_ACTIVE",
-        }),
-        {
-          status: 402,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
     const {
       messages,
       system,
@@ -157,6 +142,29 @@ export async function POST(req: Request) {
       system?: string;
       tools?: Record<string, unknown>;
     } = await req.json();
+    const canAccess = await hasActiveEntitlement(userId);
+
+    if (!canAccess) {
+      const [freeUsage] = await Promise.all([getFreeMessageUsage(userId)]);
+      const userMessagesInRequest = messages.filter((message) => message.role === "user").length;
+      const effectiveUserMessages = Math.max(freeUsage.used, userMessagesInRequest);
+      const exceededFreeLimit = effectiveUserMessages > FREE_MESSAGE_LIMIT;
+
+      if (exceededFreeLimit) {
+        return new Response(
+          JSON.stringify({
+            error: "Free message limit reached. Upgrade to continue.",
+            code: "PAYWALL_ACTIVE",
+            freeMessageLimit: FREE_MESSAGE_LIMIT,
+            freeMessagesUsed: freeUsage.used,
+          }),
+          {
+            status: 402,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
 
     // Pre-fetch context for the latest user query
     const latestQuery = extractLatestUserText(messages);

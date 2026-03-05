@@ -49,6 +49,19 @@ export function AuthCard() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const passwordStrength = getPasswordStrength(password);
 
+  const getNextPathFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const nextPath = params.get("next");
+    return nextPath?.startsWith("/") ? nextPath : null;
+  };
+
+  const persistPostAuthNextPath = () => {
+    const nextPath = getNextPathFromUrl();
+    if (nextPath) {
+      window.sessionStorage.setItem("postAuthNextPath", nextPath);
+    }
+  };
+
   const submit = async (nextMode: Mode) => {
     setLoading(true);
 
@@ -82,6 +95,7 @@ export function AuthCard() {
 
         if (signInError) throw signInError;
         toast.success("Signed in successfully");
+        persistPostAuthNextPath();
         const params = new URLSearchParams(window.location.search);
         const prompt = params.get("prompt");
         const nextPath = params.get("next");
@@ -104,6 +118,7 @@ export function AuthCard() {
     setLoading(true);
     try {
       const supabase = getBrowserSupabase();
+      persistPostAuthNextPath();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

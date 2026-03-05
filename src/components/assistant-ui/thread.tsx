@@ -227,17 +227,18 @@ function AssistantMessage() {
 
 // ─── Composer (input bar) ─────────────────────────────────────────────────────
 
-function Composer() {
+function Composer({ disabled = false }: { disabled?: boolean }) {
   return (
     <ComposerPrimitive.Root className="relative mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border border-stone-700/80 bg-stone-900 px-4 py-2 shadow-lg transition-colors focus-within:border-amber-600/60">
       <ComposerPrimitive.Input
         rows={1}
         autoFocus
+        disabled={disabled}
         placeholder="Ask about the Bhagavad Gita…"
-        className="max-h-40 flex-1 resize-none bg-transparent py-2 text-[15px] text-stone-100 placeholder-stone-500 outline-none"
+        className="max-h-40 flex-1 resize-none bg-transparent py-2 text-[15px] text-stone-100 placeholder-stone-500 outline-none disabled:cursor-not-allowed disabled:text-stone-500"
       />
 
-      <AuiIf condition={({ thread }) => thread.isRunning}>
+      <AuiIf condition={({ thread }) => !disabled && thread.isRunning}>
         <ComposerPrimitive.Cancel asChild>
           <button className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-700 text-stone-300 transition-colors hover:bg-stone-600">
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -247,7 +248,7 @@ function Composer() {
         </ComposerPrimitive.Cancel>
       </AuiIf>
 
-      <AuiIf condition={({ thread }) => !thread.isRunning}>
+      <AuiIf condition={({ thread }) => !disabled && !thread.isRunning}>
         <ComposerPrimitive.Send asChild>
           <button className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-600 text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-stone-700 disabled:text-stone-500">
             <svg
@@ -266,6 +267,16 @@ function Composer() {
           </button>
         </ComposerPrimitive.Send>
       </AuiIf>
+
+      {disabled && (
+        <button
+          type="button"
+          disabled
+          className="mb-0.5 flex h-9 items-center justify-center rounded-lg border border-stone-700 px-3 text-xs text-stone-400"
+        >
+          Upgrade to continue
+        </button>
+      )}
     </ComposerPrimitive.Root>
   );
 }
@@ -315,7 +326,7 @@ function EmptyState() {
 
 // ─── Main thread export ───────────────────────────────────────────────────────
 
-export function Thread() {
+export function Thread({ composerLocked = false }: { composerLocked?: boolean }) {
   const currentThreadId = useAuiState((s) => (s.thread as { id?: string }).id ?? "");
   const messageCount = useAuiState((s) => s.thread.messages.length);
   const [openingThreadId, setOpeningThreadId] = useState<string | null>(null);
@@ -387,9 +398,11 @@ export function Thread() {
 
       {/* Input */}
       <div className="border-t border-stone-800/60 bg-stone-950 px-4 pb-4 pt-3">
-        <Composer />
+        <Composer disabled={composerLocked} />
         <p className="mt-2 text-center text-[11px] text-stone-600">
-          Enter to send · Shift+Enter for new line
+          {composerLocked
+            ? "Message limit reached - upgrade to continue chatting"
+            : "Enter to send · Shift+Enter for new line"}
         </p>
       </div>
     </ThreadPrimitive.Root>

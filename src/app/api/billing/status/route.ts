@@ -1,4 +1,8 @@
-import { getEntitlementRow, isEntitlementActive } from "@/lib/billing/entitlement";
+import {
+  getEntitlementRow,
+  getFreeMessageUsage,
+  isEntitlementActive,
+} from "@/lib/billing/entitlement";
 import { requireRequestUserId } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
@@ -6,12 +10,19 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const userId = await requireRequestUserId(req);
-    const row = await getEntitlementRow(userId);
+    const [row, freeUsage] = await Promise.all([
+      getEntitlementRow(userId),
+      getFreeMessageUsage(userId),
+    ]);
     const active = isEntitlementActive(row);
 
     return Response.json({
       hasAccess: active,
       subscription: row,
+      freeMessageLimit: freeUsage.limit,
+      freeMessagesUsed: freeUsage.used,
+      freeMessagesRemaining: freeUsage.remaining,
+      trialLimitReached: freeUsage.reached,
       showPaidWelcomePopup:
         active === true && row?.has_seen_paid_welcome === false,
     });

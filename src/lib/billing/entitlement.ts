@@ -20,6 +20,8 @@ type BillingSubscriptionRow = {
   updated_at: string;
 };
 
+export const FREE_MESSAGE_LIMIT = 3;
+
 type EntitlementStatusShape = Pick<
   BillingSubscriptionRow,
   "subscription_active" | "billing_status" | "access_expires_at"
@@ -106,6 +108,57 @@ export function isEntitlementActive(row: EntitlementStatusShape | null): boolean
 
   const expiresAt = new Date(row.access_expires_at);
   return expiresAt.getTime() > Date.now();
+}
+
+export async function getFreeMessageUsage(userId: string): Promise<{
+  limit: number;
+  used: number;
+  remaining: number;
+  reached: boolean;
+}> {
+  const db = requireSupabaseAdmin();
+
+  const { data: threads, error: threadsError } = await db
+    .from("gita_threads")
+    .select("id")
+    .eq("user_id", userId);
+
+  if (threadsError) {
+    throw threadsError;
+  }
+
+  const threadIds = (threads ?? [])
+    .map((thread) => thread.id as string)
+    .filter(Boolean);
+
+  if (threadIds.length === 0) {
+    return {
+      limit: FREE_MESSAGE_LIMIT,
+      used: 0,
+      remaining: FREE_MESSAGE_LIMIT,
+      reached: false,
+    };
+  }
+
+  const { count, error: countError } = await db
+    .from("gita_messages")
+    .select("id", { count: "exact", head: true })
+    .in("thread_id", threadIds)
+    .eq("content->>role", "user");
+
+  if (countError) {
+    throw countError;
+  }
+
+  const used = count ?? 0;
+  const remaining = Math.max(0, FREE_MESSAGE_LIMIT - used);
+
+  return {
+    limit: FREE_MESSAGE_LIMIT,
+    used,
+    remaining,
+    reached: used >= FREE_MESSAGE_LIMIT,
+  };
 }
 
 export async function getEntitlementRow(userId: string): Promise<BillingSubscriptionRow | null> {

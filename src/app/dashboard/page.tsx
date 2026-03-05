@@ -11,10 +11,29 @@ import { ChatShell } from "@/components/assistant-ui/chat-shell";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import { SupabaseThreadListAdapter } from "@/lib/thread-adapter";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 
-function AuthenticatedChat({ session }: { session: Session }) {
+function AuthenticatedChat({
+  session,
+  composerLocked,
+  showUpgrade,
+  onUpgradeClick,
+}: {
+  session: Session;
+  composerLocked: boolean;
+  showUpgrade: boolean;
+  onUpgradeClick: () => void;
+}) {
   const adapter = useMemo(
     () => new SupabaseThreadListAdapter(session.access_token),
     [session.access_token]
@@ -36,7 +55,12 @@ function AuthenticatedChat({ session }: { session: Session }) {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ChatShell session={session} />
+      <ChatShell
+        session={session}
+        composerLocked={composerLocked}
+        showUpgrade={showUpgrade}
+        onUpgradeClick={onUpgradeClick}
+      />
     </AssistantRuntimeProvider>
   );
 }
@@ -58,6 +82,10 @@ export default function DashboardPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const [trialLimitReached, setTrialLimitReached] = useState(false);
+  const [freeMessagesRemaining, setFreeMessagesRemaining] = useState(3);
+  const [trialPaywallDismissed, setTrialPaywallDismissed] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [showPaidWelcome, setShowPaidWelcome] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<"WORLD" | "IN" | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<"WORLD" | "IN">("WORLD");
@@ -87,8 +115,17 @@ export default function DashboardPage() {
       const payload = (await res.json()) as {
         hasAccess?: boolean;
         showPaidWelcomePopup?: boolean;
+        trialLimitReached?: boolean;
+        freeMessagesRemaining?: number;
       };
-      setHasAccess(payload.hasAccess === true);
+      const access = payload.hasAccess === true;
+      const limitReached = payload.trialLimitReached === true;
+      const remaining = Number.isFinite(payload.freeMessagesRemaining)
+        ? Math.max(0, Number(payload.freeMessagesRemaining))
+        : 0;
+      setHasAccess(access);
+      setTrialLimitReached(limitReached);
+      setFreeMessagesRemaining(remaining);
       setShowPaidWelcome(payload.showPaidWelcomePopup === true);
       lastBillingCheckedTokenRef.current = nextSession.access_token;
       setSession(nextSession);
@@ -121,6 +158,51 @@ export default function DashboardPage() {
 
     return () => subscription.unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    if (!session || hasAccess) return;
+
+    const interval = window.setInterval(async () => {
+      try {
+        const res = await fetch("/api/billing/status", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        if (!res.ok) return;
+        const payload = (await res.json()) as {
+          hasAccess?: boolean;
+          trialLimitReached?: boolean;
+          freeMessagesRemaining?: number;
+        };
+        const access = payload.hasAccess === true;
+        const limitReached = payload.trialLimitReached === true;
+        const remaining = Number.isFinite(payload.freeMessagesRemaining)
+          ? Math.max(0, Number(payload.freeMessagesRemaining))
+          : 0;
+        setHasAccess(access);
+        setTrialLimitReached(limitReached);
+        setFreeMessagesRemaining(remaining);
+      } catch (error) {
+        console.error("[dashboard] billing status refresh failed", error);
+      }
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [session, hasAccess]);
+
+  useEffect(() => {
+    if (hasAccess || !trialLimitReached) {
+      setTrialPaywallDismissed(false);
+    }
+  }, [hasAccess, trialLimitReached]);
+
+  useEffect(() => {
+    if (hasAccess) {
+      setUpgradeModalOpen(false);
+      setTrialPaywallDismissed(false);
+    }
+  }, [hasAccess]);
 
   const startCheckout = async (planCode: "WORLD" | "IN") => {
     if (!session) return;
@@ -177,88 +259,94 @@ export default function DashboardPage() {
 
   return (
     <div className="relative min-h-screen bg-stone-950">
-      {hasAccess ? (
-        <AuthenticatedChat session={session} />
-      ) : (
-        <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-stone-950 px-4">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,0.08),transparent_60%)]" />
+      <AuthenticatedChat
+        session={session}
+        composerLocked={!hasAccess && trialLimitReached}
+        showUpgrade={!hasAccess}
+        onUpgradeClick={() => {
+          setTrialPaywallDismissed(false);
+          setUpgradeModalOpen(true);
+        }}
+      />
 
-          <div className="relative w-full max-w-sm">
-            <div className="mb-8 text-center">
-              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 text-base shadow-lg shadow-amber-900/30">
-                🕉
-              </div>
-              <h1 className="text-2xl font-semibold tracking-tight text-stone-100">
-                Unlock Gita AI Pro
-              </h1>
-              <p className="mt-1.5 text-sm text-stone-400">
-                One plan, full access, regional pricing.
-              </p>
-            </div>
+      {!hasAccess && !trialLimitReached && (
+        <div className="pointer-events-none fixed left-1/2 top-16 z-40 -translate-x-1/2 rounded-full border border-amber-700/50 bg-stone-900/90 px-3 py-1.5 text-xs text-amber-200 shadow-lg shadow-black/30">
+          {freeMessagesRemaining} free message{freeMessagesRemaining === 1 ? "" : "s"} left
+        </div>
+      )}
 
-            <div className="overflow-hidden rounded-2xl border border-stone-800 bg-stone-900/80 shadow-2xl shadow-black/40 backdrop-blur-sm">
-
-              <div className="flex border-b border-stone-800">
-                {plans.map((plan) => (
-                  <button
-                    key={plan.code}
-                    onClick={() => setSelectedPlan(plan.code)}
-                    className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
-                      selectedPlan === plan.code
-                        ? "bg-stone-800 text-stone-100"
-                        : "text-stone-500 hover:text-stone-300"
-                    }`}
-                  >
-                    {plan.region}
-                  </button>
-                ))}
-              </div>
-
-              {(() => {
-                const plan = plans.find((p) => p.code === selectedPlan)!;
-                return (
-                  <div className="p-6">
-                    <div className="mb-5">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-4xl font-bold text-amber-400">{plan.amount}</span>
-                        <span className="text-sm text-stone-400">{plan.period}</span>
-                      </div>
-                    </div>
-
-                    <ul className="mb-6 space-y-2.5">
-                      {features.map((f) => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm text-stone-300">
-                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Button
-                      className="w-full bg-amber-600 py-5 text-sm font-medium text-white shadow-md shadow-amber-900/30 hover:bg-amber-500"
-                      onClick={() => void startCheckout(plan.code)}
-                      disabled={checkoutLoading !== null}
-                    >
-                      {checkoutLoading === plan.code ? "Redirecting..." : plan.cta}
-                    </Button>
-
-                    <p className="mt-3 text-center text-xs text-stone-500">
-                      Secure checkout · Cancel anytime
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => router.push("/")}
-                className="text-xs text-stone-500 transition-colors hover:text-stone-300"
+      {!hasAccess && (upgradeModalOpen || (trialLimitReached && !trialPaywallDismissed)) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/72 backdrop-blur-sm" />
+          <Card className="relative w-full max-w-md border-stone-800 bg-stone-900 text-stone-100 shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between border-b border-stone-800 px-6 pt-6 pb-4">
+              <Tabs
+                value={selectedPlan}
+                onValueChange={(value) => setSelectedPlan(value as "WORLD" | "IN")}
               >
-                Back to home
+                <TabsList className="grid w-full grid-cols-2 bg-stone-800/80">
+                  <TabsTrigger value="WORLD">World</TabsTrigger>
+                  <TabsTrigger value="IN">India</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => {
+                  if (trialLimitReached) setTrialPaywallDismissed(true);
+                  setUpgradeModalOpen(false);
+                }}
+                className="-mr-2 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-800 hover:text-stone-200"
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
-          </div>
+
+            <CardHeader className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 text-lg">
+                  🕉
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-bold text-amber-400">
+                    {plans.find((p) => p.code === selectedPlan)!.amount}
+                    <span className="ml-1.5 text-base font-normal text-stone-400">
+                      {plans.find((p) => p.code === selectedPlan)!.period}
+                    </span>
+                  </CardTitle>
+                  <CardDescription className="mt-0.5 text-stone-400">
+                    Free messages complete. Upgrade to send more.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <ul className="space-y-2.5">
+                {features.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-stone-300">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-3">
+              <Button
+                className="w-full bg-amber-600 py-5 text-sm font-medium text-white hover:bg-amber-500"
+                onClick={() => void startCheckout(selectedPlan)}
+                disabled={checkoutLoading !== null}
+              >
+                {checkoutLoading === selectedPlan
+                  ? "Redirecting..."
+                  : plans.find((p) => p.code === selectedPlan)!.cta}
+              </Button>
+              <p className="text-center text-xs text-stone-500">
+                Secure checkout · Cancel anytime
+              </p>
+            </CardFooter>
+          </Card>
         </div>
       )}
 

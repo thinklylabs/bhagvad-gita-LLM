@@ -30,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SquarePen, MessageSquare, MoreHorizontal, Trash2, Archive, LogOut, ChevronUp, Settings } from "lucide-react";
+import { SquarePen, MessageSquare, MoreHorizontal, Trash2, Archive, LogOut, ChevronUp, Settings, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, type ReactNode } from "react";
 
@@ -125,9 +125,13 @@ function ConversationItem() {
 function GitaSidebar({
   session,
   showThreads = true,
+  showUpgrade = false,
+  onUpgradeClick,
 }: {
   session: Session;
   showThreads?: boolean;
+  showUpgrade?: boolean;
+  onUpgradeClick?: () => void;
 }) {
   const handleSignOut = async () => {
     const supabase = getBrowserSupabase();
@@ -230,6 +234,15 @@ function GitaSidebar({
                     Settings
                   </Link>
                 </DropdownMenuItem>
+                {showUpgrade && (
+                  <DropdownMenuItem
+                    className="cursor-pointer text-amber-300 focus:bg-stone-800 focus:text-amber-200"
+                    onClick={onUpgradeClick}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Upgrade
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-stone-800"
                   onClick={handleSignOut}
@@ -250,10 +263,20 @@ function GitaSidebar({
 
 // ─── Shell export ─────────────────────────────────────────────────────────────
 
-export function ChatShell({ session }: { session: Session }) {
+export function ChatShell({
+  session,
+  composerLocked = false,
+  showUpgrade = false,
+  onUpgradeClick,
+}: {
+  session: Session;
+  composerLocked?: boolean;
+  showUpgrade?: boolean;
+  onUpgradeClick?: () => void;
+}) {
   return (
-    <AppShell session={session}>
-      <Thread />
+    <AppShell session={session} showUpgrade={showUpgrade} onUpgradeClick={onUpgradeClick}>
+      <Thread composerLocked={composerLocked} />
     </AppShell>
   );
 }
@@ -264,12 +287,16 @@ export function AppShell({
   title,
   showThreads = true,
   headerContent,
+  showUpgrade = false,
+  onUpgradeClick,
 }: {
   session: Session;
   children: ReactNode;
   title?: string;
   showThreads?: boolean;
   headerContent?: ReactNode;
+  showUpgrade?: boolean;
+  onUpgradeClick?: () => void;
 }) {
   const pathname = usePathname();
 
@@ -302,7 +329,12 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen>
-      <GitaSidebar session={session} showThreads={showThreads} />
+      <GitaSidebar
+        session={session}
+        showThreads={showThreads}
+        showUpgrade={showUpgrade}
+        onUpgradeClick={onUpgradeClick}
+      />
       <SidebarInset className="flex h-screen min-h-0 flex-col bg-stone-950">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-stone-800/60 px-4">
           <SidebarTrigger className="-ml-1 text-stone-400 hover:bg-stone-800 hover:text-stone-200" />
