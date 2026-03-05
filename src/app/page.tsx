@@ -1,17 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SiteFooter, SiteNavbar } from "@/components/site/chrome";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 export default function LandingPage() {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const [showLoginPopup, setShowLoginPopup] = useState(false);
+
+  useEffect(() => {
+    getBrowserSupabase().auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/dashboard");
+      }
+    });
+  }, [router]);
 
   const goToDashboard = () => {
     setShowLoginPopup(true);
