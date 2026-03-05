@@ -19,18 +19,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 
 function AuthenticatedChat({
   session,
   composerLocked,
+  hasPaidAccess,
   showUpgrade,
   onUpgradeClick,
 }: {
   session: Session;
   composerLocked: boolean;
+  hasPaidAccess: boolean;
   showUpgrade: boolean;
   onUpgradeClick: () => void;
 }) {
@@ -58,17 +59,13 @@ function AuthenticatedChat({
       <ChatShell
         session={session}
         composerLocked={composerLocked}
+        hasPaidAccess={hasPaidAccess}
         showUpgrade={showUpgrade}
         onUpgradeClick={onUpgradeClick}
       />
     </AssistantRuntimeProvider>
   );
 }
-
-const plans = [
-  { code: "WORLD", region: "World", amount: "$5", period: "per month", cta: "Subscribe for $5/month" },
-  { code: "IN", region: "India", amount: "₹279", period: "per month", cta: "Subscribe for ₹279/month" },
-] as const;
 
 const features = [
   "Unlimited conversations with persistent history",
@@ -87,8 +84,7 @@ export default function DashboardPage() {
   const [trialPaywallDismissed, setTrialPaywallDismissed] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [showPaidWelcome, setShowPaidWelcome] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState<"WORLD" | "IN" | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<"WORLD" | "IN">("WORLD");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const lastBillingCheckedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -204,17 +200,17 @@ export default function DashboardPage() {
     }
   }, [hasAccess]);
 
-  const startCheckout = async (planCode: "WORLD" | "IN") => {
+  const startCheckout = async () => {
     if (!session) return;
     try {
-      setCheckoutLoading(planCode);
+      setCheckoutLoading(true);
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ planCode }),
+        body: JSON.stringify({ planCode: "PRO" }),
       });
       const payload = (await response.json()) as { checkoutUrl?: string; error?: string };
       if (!response.ok || !payload.checkoutUrl) {
@@ -224,7 +220,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("[dashboard] checkout start failed", error);
     } finally {
-      setCheckoutLoading(null);
+      setCheckoutLoading(false);
     }
   };
 
@@ -262,6 +258,7 @@ export default function DashboardPage() {
       <AuthenticatedChat
         session={session}
         composerLocked={!hasAccess && trialLimitReached}
+        hasPaidAccess={hasAccess}
         showUpgrade={!hasAccess}
         onUpgradeClick={() => {
           setTrialPaywallDismissed(false);
@@ -280,15 +277,9 @@ export default function DashboardPage() {
           <div className="absolute inset-0 bg-black/72 backdrop-blur-sm" />
           <Card className="relative w-full max-w-md border-stone-800 bg-stone-900 text-stone-100 shadow-2xl shadow-black/50">
             <div className="flex items-center justify-between border-b border-stone-800 px-6 pt-6 pb-4">
-              <Tabs
-                value={selectedPlan}
-                onValueChange={(value) => setSelectedPlan(value as "WORLD" | "IN")}
-              >
-                <TabsList className="grid w-full grid-cols-2 bg-stone-800/80">
-                  <TabsTrigger value="WORLD">World</TabsTrigger>
-                  <TabsTrigger value="IN">India</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                Gita AI Pro
+              </div>
               <button
                 type="button"
                 aria-label="Close"
@@ -309,9 +300,9 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <CardTitle className="text-2xl font-bold text-amber-400">
-                    {plans.find((p) => p.code === selectedPlan)!.amount}
+                    $2.99
                     <span className="ml-1.5 text-base font-normal text-stone-400">
-                      {plans.find((p) => p.code === selectedPlan)!.period}
+                      per month
                     </span>
                   </CardTitle>
                   <CardDescription className="mt-0.5 text-stone-400">
@@ -335,12 +326,10 @@ export default function DashboardPage() {
             <CardFooter className="flex flex-col gap-3">
               <Button
                 className="w-full bg-amber-600 py-5 text-sm font-medium text-white hover:bg-amber-500"
-                onClick={() => void startCheckout(selectedPlan)}
-                disabled={checkoutLoading !== null}
+                onClick={() => void startCheckout()}
+                disabled={checkoutLoading}
               >
-                {checkoutLoading === selectedPlan
-                  ? "Redirecting..."
-                  : plans.find((p) => p.code === selectedPlan)!.cta}
+                {checkoutLoading ? "Redirecting..." : "Subscribe for $2.99/month"}
               </Button>
               <p className="text-center text-xs text-stone-500">
                 Secure checkout · Cancel anytime

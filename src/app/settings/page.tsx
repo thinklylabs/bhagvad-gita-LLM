@@ -172,6 +172,7 @@ function SettingsContent({ session }: { session: Session }) {
   return (
     <AppShell
       session={session}
+      canStartNewConversation={hasActiveSubscription}
       headerContent={
         <Breadcrumb>
           <BreadcrumbList>
@@ -246,7 +247,8 @@ function SettingsContent({ session }: { session: Session }) {
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-stone-300">
               <div>Status: {billing?.subscription?.billing_status ?? "inactive"}</div>
-              <div>Plan: {billing?.subscription?.plan_code ?? "None"}</div>
+              <div>Plan: Gita AI Pro</div>
+              <div>Price: $2.99/month</div>
               <div>
                 Expires at:{" "}
                 {billing?.subscription?.access_expires_at

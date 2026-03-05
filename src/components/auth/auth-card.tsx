@@ -46,21 +46,7 @@ export function AuthCard() {
   const [loading, setLoading] = useState(false);
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const passwordStrength = getPasswordStrength(password);
-
-  const getNextPathFromUrl = () => {
-    const params = new URLSearchParams(window.location.search);
-    const nextPath = params.get("next");
-    return nextPath?.startsWith("/") ? nextPath : null;
-  };
-
-  const persistPostAuthNextPath = () => {
-    const nextPath = getNextPathFromUrl();
-    if (nextPath) {
-      window.sessionStorage.setItem("postAuthNextPath", nextPath);
-    }
-  };
 
   const submit = async (nextMode: Mode) => {
     setLoading(true);
@@ -95,16 +81,9 @@ export function AuthCard() {
 
         if (signInError) throw signInError;
         toast.success("Signed in successfully");
-        persistPostAuthNextPath();
         const params = new URLSearchParams(window.location.search);
         const prompt = params.get("prompt");
-        const nextPath = params.get("next");
-
-        if (nextPath?.startsWith("/")) {
-          router.push(nextPath);
-        } else {
-          router.push(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard");
-        }
+        router.push(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Authentication failed";
@@ -118,11 +97,13 @@ export function AuthCard() {
     setLoading(true);
     try {
       const supabase = getBrowserSupabase();
-      persistPostAuthNextPath();
+      const params = new URLSearchParams(window.location.search);
+      const prompt = params.get("prompt");
+      const redirectQuery = prompt ? `?prompt=${encodeURIComponent(prompt)}` : "";
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth${window.location.search}`,
+          redirectTo: `${window.location.origin}/auth${redirectQuery}`,
         },
       });
       if (error) throw error;

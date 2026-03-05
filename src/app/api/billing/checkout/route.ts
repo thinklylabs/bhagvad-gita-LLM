@@ -6,7 +6,7 @@ import { requireRequestSupabase } from "@/lib/auth-server";
 export const runtime = "nodejs";
 
 const CheckoutBodySchema = z.object({
-  planCode: z.enum(["WORLD", "IN"]),
+  planCode: z.enum(["PRO"]).optional(),
 });
 
 function getCheckoutUrls(baseUrl: string) {
@@ -18,7 +18,7 @@ function getCheckoutUrls(baseUrl: string) {
 
 export async function POST(req: Request) {
   try {
-    const { planCode } = CheckoutBodySchema.parse(await req.json());
+    CheckoutBodySchema.parse(await req.json().catch(() => ({})));
     const db = requireRequestSupabase(req);
     const {
       data: { user },
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     }
 
     const dodo = getDodoConfig();
-    const plan = getPlanConfig(planCode as PlanCode);
+    const plan = getPlanConfig("PRO" as PlanCode);
     const urls = getCheckoutUrls(dodo.returnUrlBase);
 
     const session = await createCheckoutSession(

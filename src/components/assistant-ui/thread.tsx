@@ -10,8 +10,9 @@ import {
   useAuiState,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { STANDARD_QUESTIONS, getRandomQuestions } from "@/lib/standard-questions";
 
 // ─── Markdown text component used by assistant messages ───────────────────────
 
@@ -227,7 +228,13 @@ function AssistantMessage() {
 
 // ─── Composer (input bar) ─────────────────────────────────────────────────────
 
-function Composer({ disabled = false }: { disabled?: boolean }) {
+function Composer({
+  disabled = false,
+  onUpgradeClick,
+}: {
+  disabled?: boolean;
+  onUpgradeClick?: () => void;
+}) {
   return (
     <ComposerPrimitive.Root className="relative mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border border-stone-700/80 bg-stone-900 px-4 py-2 shadow-lg transition-colors focus-within:border-amber-600/60">
       <ComposerPrimitive.Input
@@ -271,8 +278,8 @@ function Composer({ disabled = false }: { disabled?: boolean }) {
       {disabled && (
         <button
           type="button"
-          disabled
-          className="mb-0.5 flex h-9 items-center justify-center rounded-lg border border-stone-700 px-3 text-xs text-stone-400"
+          onClick={onUpgradeClick}
+          className="mb-0.5 flex h-9 items-center justify-center rounded-lg border border-stone-700 px-3 text-xs text-stone-400 transition-colors hover:border-amber-700/60 hover:text-amber-200"
         >
           Upgrade to continue
         </button>
@@ -283,14 +290,18 @@ function Composer({ disabled = false }: { disabled?: boolean }) {
 
 // ─── Suggestions ──────────────────────────────────────────────────────────────
 
-const SUGGESTIONS = [
-  "What is the main teaching of the Bhagavad Gita?",
-  "What does Krishna say about duty (dharma)?",
-  "Explain the concept of nishkama karma",
-  "What is the difference between the soul and the body?",
-];
+function EmptyState({
+  suggestionsEnabled,
+  questionSetKey,
+}: {
+  suggestionsEnabled: boolean;
+  questionSetKey: string;
+}) {
+  const suggestions = useMemo(
+    () => getRandomQuestions(STANDARD_QUESTIONS, 4),
+    [questionSetKey]
+  );
 
-function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center px-4">
       <div className="mb-8 text-center">
@@ -307,26 +318,50 @@ function EmptyState() {
       </div>
 
       <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
-        {SUGGESTIONS.map((text) => (
-          <ThreadPrimitive.Suggestion
-            key={text}
-            prompt={text}
-            send
-            asChild
-          >
-            <button className="w-full rounded-xl border border-stone-700/60 bg-stone-900/60 px-4 py-3 text-left text-[13px] leading-snug text-stone-300 transition-all hover:border-amber-700/50 hover:bg-stone-800/80 hover:text-stone-100">
+        {suggestions.map((text) =>
+          suggestionsEnabled ? (
+            <ThreadPrimitive.Suggestion
+              key={text}
+              prompt={text}
+              send
+              asChild
+            >
+              <button className="w-full rounded-xl border border-stone-700/60 bg-stone-900/60 px-4 py-3 text-left text-[13px] leading-snug text-stone-300 transition-all hover:border-amber-700/50 hover:bg-stone-800/80 hover:text-stone-100">
+                {text}
+              </button>
+            </ThreadPrimitive.Suggestion>
+          ) : (
+            <button
+              key={text}
+              type="button"
+              disabled
+              className="w-full cursor-not-allowed rounded-xl border border-stone-800/80 bg-stone-900/50 px-4 py-3 text-left text-[13px] leading-snug text-stone-500"
+            >
               {text}
             </button>
-          </ThreadPrimitive.Suggestion>
-        ))}
+          )
+        )}
       </div>
+      {!suggestionsEnabled && (
+        <p className="mt-3 text-center text-xs text-stone-500">
+          Upgrade to unlock starter questions.
+        </p>
+      )}
     </div>
   );
 }
 
 // ─── Main thread export ───────────────────────────────────────────────────────
 
-export function Thread({ composerLocked = false }: { composerLocked?: boolean }) {
+export function Thread({
+  composerLocked = false,
+  suggestionsLocked = false,
+  onUpgradeClick,
+}: {
+  composerLocked?: boolean;
+  suggestionsLocked?: boolean;
+  onUpgradeClick?: () => void;
+}) {
   const currentThreadId = useAuiState((s) => (s.thread as { id?: string }).id ?? "");
   const messageCount = useAuiState((s) => s.thread.messages.length);
   const [openingThreadId, setOpeningThreadId] = useState<string | null>(null);
@@ -373,7 +408,10 @@ export function Thread({ composerLocked = false }: { composerLocked?: boolean })
     <ThreadPrimitive.Root className="flex h-full flex-col">
       {/* Empty state */}
       <ThreadPrimitive.Empty>
-        <EmptyState />
+        <EmptyState
+          suggestionsEnabled={!suggestionsLocked}
+          questionSetKey={currentThreadId || "default"}
+        />
       </ThreadPrimitive.Empty>
 
       {/* Messages viewport */}
@@ -398,7 +436,7 @@ export function Thread({ composerLocked = false }: { composerLocked?: boolean })
 
       {/* Input */}
       <div className="border-t border-stone-800/60 bg-stone-950 px-4 pb-4 pt-3">
-        <Composer disabled={composerLocked} />
+        <Composer disabled={composerLocked} onUpgradeClick={onUpgradeClick} />
         <p className="mt-2 text-center text-[11px] text-stone-600">
           {composerLocked
             ? "Message limit reached - upgrade to continue chatting"

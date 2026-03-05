@@ -7,32 +7,14 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SiteFooter, SiteNavbar } from "@/components/site/chrome";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
-
-const plans = [
-  {
-    region: "World",
-    code: "WORLD",
-    amount: "$5",
-    cta: "Subscribe for $5/month",
-  },
-  {
-    region: "India",
-    code: "IN",
-    amount: "₹279",
-    cta: "Subscribe for ₹279/month",
-  },
-] as const;
 
 export default function PricingPage() {
   const router = useRouter();
   const supabase = useMemo(() => getBrowserSupabase(), []);
-  const [region, setRegion] = useState<"WORLD" | "IN">("WORLD");
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const plan = plans.find((p) => p.code === region)!;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -49,7 +31,7 @@ export default function PricingPage() {
       } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
-        router.push("/auth?next=/pricing");
+        router.push("/auth");
         return;
       }
 
@@ -59,7 +41,7 @@ export default function PricingPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ planCode: region }),
+        body: JSON.stringify({ planCode: "PRO" }),
       });
 
       const payload = (await response.json()) as {
@@ -93,32 +75,18 @@ export default function PricingPage() {
             Clear, Honest Pricing
           </h1>
           <p className="mt-3 text-sm text-stone-400 sm:text-base">
-            Regional monthly pricing for full access to your Gita AI workspace.
+            One simple monthly plan for full access to your Gita AI workspace.
           </p>
         </div>
 
-        <Tabs
-          value={region}
-          onValueChange={(value) => setRegion(value as "WORLD" | "IN")}
-          className="mb-4 w-full max-w-md"
-        >
-          <TabsList className="grid w-full grid-cols-2 bg-stone-900/70">
-            <TabsTrigger value="WORLD">World</TabsTrigger>
-            <TabsTrigger value="IN">India</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
         <Card className="w-full max-w-md border-stone-800 bg-stone-900/70 text-stone-100 shadow-2xl shadow-black/30">
           <CardHeader>
-            <div className="mb-1 inline-flex w-fit rounded-full border border-stone-700 px-2 py-0.5 text-[11px] text-stone-400">
-              {plan.region}
-            </div>
             <CardTitle className="text-2xl">Gita AI Pro</CardTitle>
             <CardDescription className="text-stone-400">
               Built for daily reflection, difficult decisions, and grounded guidance from the Bhagavad Gita.
             </CardDescription>
             <div className="pt-2">
-              <span className="text-4xl font-bold text-amber-400">{plan.amount}</span>
+              <span className="text-4xl font-bold text-amber-400">$2.99</span>
               <span className="ml-2 text-stone-400">per month</span>
             </div>
           </CardHeader>
@@ -149,7 +117,7 @@ export default function PricingPage() {
               {loadingCheckout
                 ? "Redirecting..."
                 : isLoggedIn
-                  ? plan.cta
+                  ? "Subscribe for $2.99/month"
                   : "Sign up to subscribe"}
             </Button>
             <p className="text-center text-xs text-stone-500">

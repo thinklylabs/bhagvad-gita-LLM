@@ -125,11 +125,13 @@ function ConversationItem() {
 function GitaSidebar({
   session,
   showThreads = true,
+  canStartNewConversation = true,
   showUpgrade = false,
   onUpgradeClick,
 }: {
   session: Session;
   showThreads?: boolean;
+  canStartNewConversation?: boolean;
   showUpgrade?: boolean;
   onUpgradeClick?: () => void;
 }) {
@@ -162,7 +164,7 @@ function GitaSidebar({
             </span>
           </Link>
 
-          {showThreads ? (
+          {showThreads && canStartNewConversation ? (
             <ThreadListPrimitive.New asChild>
               <Button
                 variant="ghost"
@@ -174,6 +176,17 @@ function GitaSidebar({
                 <span className="sr-only">New conversation</span>
               </Button>
             </ThreadListPrimitive.New>
+          ) : showThreads ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled
+              className="h-8 w-8 text-sidebar-foreground/40"
+              title="Upgrade to start a new conversation"
+            >
+              <SquarePen className="h-4 w-4" />
+              <span className="sr-only">New conversation unavailable</span>
+            </Button>
           ) : (
             <div className="h-8 w-8" />
           )}
@@ -266,17 +279,28 @@ function GitaSidebar({
 export function ChatShell({
   session,
   composerLocked = false,
+  hasPaidAccess = false,
   showUpgrade = false,
   onUpgradeClick,
 }: {
   session: Session;
   composerLocked?: boolean;
+  hasPaidAccess?: boolean;
   showUpgrade?: boolean;
   onUpgradeClick?: () => void;
 }) {
   return (
-    <AppShell session={session} showUpgrade={showUpgrade} onUpgradeClick={onUpgradeClick}>
-      <Thread composerLocked={composerLocked} />
+    <AppShell
+      session={session}
+      canStartNewConversation={hasPaidAccess}
+      showUpgrade={showUpgrade}
+      onUpgradeClick={onUpgradeClick}
+    >
+      <Thread
+        composerLocked={composerLocked}
+        suggestionsLocked={!hasPaidAccess}
+        onUpgradeClick={onUpgradeClick}
+      />
     </AppShell>
   );
 }
@@ -286,6 +310,7 @@ export function AppShell({
   children,
   title,
   showThreads = true,
+  canStartNewConversation = true,
   headerContent,
   showUpgrade = false,
   onUpgradeClick,
@@ -294,6 +319,7 @@ export function AppShell({
   children: ReactNode;
   title?: string;
   showThreads?: boolean;
+  canStartNewConversation?: boolean;
   headerContent?: ReactNode;
   showUpgrade?: boolean;
   onUpgradeClick?: () => void;
@@ -332,6 +358,7 @@ export function AppShell({
       <GitaSidebar
         session={session}
         showThreads={showThreads}
+        canStartNewConversation={canStartNewConversation}
         showUpgrade={showUpgrade}
         onUpgradeClick={onUpgradeClick}
       />

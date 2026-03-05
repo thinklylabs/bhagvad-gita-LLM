@@ -20,20 +20,7 @@ export default function AuthPage() {
 
       const params = new URLSearchParams(window.location.search);
       const prompt = params.get("prompt");
-      const nextFromQuery = params.get("next");
-      const nextFromStorage = window.sessionStorage.getItem("postAuthNextPath");
-      const nextPath =
-        (nextFromQuery?.startsWith("/") ? nextFromQuery : null) ??
-        (nextFromStorage?.startsWith("/") ? nextFromStorage : null);
-
-      if (nextFromStorage) {
-        window.sessionStorage.removeItem("postAuthNextPath");
-      }
-
-      if (nextPath) {
-        router.replace(nextPath);
-        return;
-      }
+      window.sessionStorage.removeItem("postAuthNextPath");
 
       router.replace(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard");
     };

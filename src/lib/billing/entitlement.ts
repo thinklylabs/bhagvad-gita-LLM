@@ -193,7 +193,7 @@ export async function upsertEntitlementFromWebhook(payload: WebhookPayload): Pro
   const data = payload.data as Record<string, unknown>;
   const customer = (data.customer ?? null) as Record<string, unknown> | null;
   const planCodeRaw = dataMetadataPlanCode(data, customer);
-  const planCode = planCodeRaw === "WORLD" || planCodeRaw === "IN" ? planCodeRaw : null;
+  const planCode = planCodeRaw === "PRO" ? planCodeRaw : null;
   const currentPeriodEnd = toIsoOrNull(data.next_billing_date);
   const accessExpiresAt =
     nextStatus === "active" ? currentPeriodEnd : nextStatus === "canceled" || nextStatus === "expired" ? currentPeriodEnd : null;

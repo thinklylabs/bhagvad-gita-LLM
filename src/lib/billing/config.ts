@@ -1,4 +1,4 @@
-export type PlanCode = "WORLD" | "IN";
+export type PlanCode = "PRO";
 
 type PlanConfig = {
   code: PlanCode;
@@ -27,13 +27,12 @@ export function getDodoConfig() {
 
 export function getPlanConfig(planCode: PlanCode): PlanConfig {
   const plans: Record<PlanCode, PlanConfig> = {
-    WORLD: {
-      code: "WORLD",
-      productId: requireEnv("DODO_PAYMENTS_PLAN_WORLD_PRODUCT_ID"),
-    },
-    IN: {
-      code: "IN",
-      productId: requireEnv("DODO_PAYMENTS_PLAN_IN_PRODUCT_ID"),
+    PRO: {
+      code: "PRO",
+      productId:
+        process.env.DODO_PAYMENTS_PLAN_PRODUCT_ID ??
+        process.env.DODO_PAYMENTS_PLAN_WORLD_PRODUCT_ID ??
+        requireEnv("DODO_PAYMENTS_PLAN_IN_PRODUCT_ID"),
     },
   };
 
