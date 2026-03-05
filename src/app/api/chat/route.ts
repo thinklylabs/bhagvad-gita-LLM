@@ -9,6 +9,8 @@ import {
 } from "ai";
 import { z } from "zod";
 import { formatRagContext, searchGitaContext } from "@/lib/rag";
+import { hasActiveEntitlement } from "@/lib/billing/entitlement";
+import { requireRequestUserId } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 
@@ -130,6 +132,22 @@ function buildFallbackConceptQuery(userQuery: string): string {
 
 export async function POST(req: Request) {
   try {
+    const userId = await requireRequestUserId(req);
+    const canAccess = await hasActiveEntitlement(userId);
+
+    if (!canAccess) {
+      return new Response(
+        JSON.stringify({
+          error: "Subscription required",
+          code: "PAYWALL_ACTIVE",
+        }),
+        {
+          status: 402,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const {
       messages,
       system,
@@ -236,6 +254,12 @@ ${initialContext}
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     console.error("[chat] error:", error);
     return new Response(
       JSON.stringify({ error: "Failed to process chat request" }),

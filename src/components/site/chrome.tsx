@@ -1,8 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 export function SiteNavbar() {
+  const router = useRouter();
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabase();
+    supabase.auth.getSession().then(({ data }) => {
+      setLoggedIn(!!data.session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(!!session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = getBrowserSupabase();
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
   return (
     <header className="border-b border-stone-900/80">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
@@ -17,12 +40,29 @@ export function SiteNavbar() {
           <Link href="/pricing" className="text-stone-400 transition-colors hover:text-stone-200">
             Pricing
           </Link>
-          <Link
-            href="/auth"
-            className="rounded-md border border-amber-600/70 bg-amber-600/20 px-3 py-1.5 text-stone-100 transition-colors hover:bg-amber-600/30"
-          >
-            Login
-          </Link>
+          {loggedIn ? (
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard"
+                className="rounded-md border border-amber-600/70 bg-amber-600/20 px-3 py-1.5 text-stone-100 transition-colors hover:bg-amber-600/30"
+              >
+                Dashboard
+              </Link>
+              <button
+                onClick={() => void handleSignOut()}
+                className="text-stone-500 transition-colors hover:text-stone-300"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/auth"
+              className="rounded-md border border-amber-600/70 bg-amber-600/20 px-3 py-1.5 text-stone-100 transition-colors hover:bg-amber-600/30"
+            >
+              Login
+            </Link>
+          )}
         </nav>
       </div>
     </header>

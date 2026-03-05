@@ -7,8 +7,11 @@ import {
   ActionBarPrimitive,
   AuiIf,
   useMessage,
+  useAuiState,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import { useEffect, useState } from "react";
+import { Spinner } from "@/components/ui/spinner";
 
 // ─── Markdown text component used by assistant messages ───────────────────────
 
@@ -313,6 +316,48 @@ function EmptyState() {
 // ─── Main thread export ───────────────────────────────────────────────────────
 
 export function Thread() {
+  const currentThreadId = useAuiState((s) => (s.thread as { id?: string }).id ?? "");
+  const messageCount = useAuiState((s) => s.thread.messages.length);
+  const [openingThreadId, setOpeningThreadId] = useState<string | null>(null);
+  const [showThreadLoader, setShowThreadLoader] = useState(false);
+
+  useEffect(() => {
+    const onThreadOpenStart = (event: Event) => {
+      const detail = (event as CustomEvent<{ threadId?: string }>).detail;
+      const threadId = detail?.threadId;
+      if (!threadId) return;
+      setOpeningThreadId(threadId);
+      setShowThreadLoader(true);
+    };
+
+    window.addEventListener("gita:thread-open-start", onThreadOpenStart);
+    return () =>
+      window.removeEventListener("gita:thread-open-start", onThreadOpenStart);
+  }, []);
+
+  useEffect(() => {
+    if (!showThreadLoader) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setShowThreadLoader(false);
+      setOpeningThreadId(null);
+    }, 2000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [showThreadLoader]);
+
+  useEffect(() => {
+    if (!showThreadLoader || !openingThreadId) return;
+    if (currentThreadId !== openingThreadId) return;
+
+    // For existing chats, this flips off as soon as messages are hydrated.
+    // For edge cases (empty thread), the timeout fallback above clears it.
+    if (messageCount > 0) {
+      setShowThreadLoader(false);
+      setOpeningThreadId(null);
+    }
+  }, [currentThreadId, messageCount, openingThreadId, showThreadLoader]);
+
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col">
       {/* Empty state */}
@@ -321,7 +366,15 @@ export function Thread() {
       </ThreadPrimitive.Empty>
 
       {/* Messages viewport */}
-      <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
+      <ThreadPrimitive.Viewport className="relative flex-1 overflow-y-auto">
+        {showThreadLoader && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-stone-950/40 pt-8 backdrop-blur-[1px]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-stone-700 bg-stone-900/90 px-3 py-1.5 text-xs text-stone-300 shadow-lg">
+              <Spinner className="size-3.5 text-amber-400" />
+              Loading conversation...
+            </div>
+          </div>
+        )}
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
           <ThreadPrimitive.Messages
             components={{

@@ -15,10 +15,16 @@ export default function AuthPage() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        const prompt = new URLSearchParams(window.location.search).get("prompt");
-        router.replace(
-          prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard"
-        );
+        const params = new URLSearchParams(window.location.search);
+        const prompt = params.get("prompt");
+        const nextPath = params.get("next");
+
+        if (nextPath?.startsWith("/")) {
+          router.replace(nextPath);
+          return;
+        }
+
+        router.replace(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard");
         return;
       }
       setLoading(false);

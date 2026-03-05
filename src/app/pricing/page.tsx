@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SiteFooter, SiteNavbar } from "@/components/site/chrome";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 const plans = [
   {
@@ -24,8 +27,58 @@ const plans = [
 ] as const;
 
 export default function PricingPage() {
+  const router = useRouter();
+  const supabase = useMemo(() => getBrowserSupabase(), []);
   const [region, setRegion] = useState<"WORLD" | "IN">("WORLD");
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const plan = plans.find((p) => p.code === region)!;
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data.session);
+    });
+  }, [supabase]);
+
+  const startCheckout = async () => {
+    try {
+      setLoadingCheckout(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        router.push("/auth?next=/pricing");
+        return;
+      }
+
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ planCode: region }),
+      });
+
+      const payload = (await response.json()) as {
+        checkoutUrl?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.checkoutUrl) {
+        throw new Error(payload.error ?? "Failed to initialize checkout");
+      }
+
+      window.location.href = payload.checkoutUrl;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Checkout failed";
+      toast.error(message);
+    } finally {
+      setLoadingCheckout(false);
+    }
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-stone-950">
@@ -88,8 +141,16 @@ export default function PricingPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button className="w-full bg-amber-600 text-white hover:bg-amber-500">
-              {plan.cta}
+            <Button
+              className="w-full bg-amber-600 text-white hover:bg-amber-500"
+              onClick={() => void startCheckout()}
+              disabled={loadingCheckout}
+            >
+              {loadingCheckout
+                ? "Redirecting..."
+                : isLoggedIn
+                  ? plan.cta
+                  : "Sign up to subscribe"}
             </Button>
             <p className="text-center text-xs text-stone-500">
               Secure checkout. Cancel anytime.

@@ -150,21 +150,19 @@ function SupabaseAdapterProvider({ children }: PropsWithChildren) {
 // ─── RemoteThreadListAdapter backed by Supabase ───────────────────────────────
 
 export class SupabaseThreadListAdapter implements RemoteThreadListAdapter {
+  constructor(private readonly accessToken?: string) {}
+
   unstable_Provider: ComponentType<PropsWithChildren> = SupabaseAdapterProvider;
 
   private async authedFetch(input: string, init?: RequestInit) {
-    const supabase = getBrowserSupabase();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
+    const token = this.accessToken;
+    if (!token) {
       toast.error("Session expired. Please sign in again.");
       throw new Error("Not authenticated");
     }
 
     const headers = new Headers(init?.headers);
-    headers.set("Authorization", `Bearer ${session.access_token}`);
+    headers.set("Authorization", `Bearer ${token}`);
     headers.set("Content-Type", "application/json");
 
     return fetch(input, { ...init, headers });

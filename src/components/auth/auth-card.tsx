@@ -82,10 +82,15 @@ export function AuthCard() {
 
         if (signInError) throw signInError;
         toast.success("Signed in successfully");
-        const prompt = new URLSearchParams(window.location.search).get("prompt");
-        router.push(
-          prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard"
-        );
+        const params = new URLSearchParams(window.location.search);
+        const prompt = params.get("prompt");
+        const nextPath = params.get("next");
+
+        if (nextPath?.startsWith("/")) {
+          router.push(nextPath);
+        } else {
+          router.push(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard");
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Authentication failed";
@@ -102,7 +107,7 @@ export function AuthCard() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `${window.location.origin}/auth${window.location.search}`,
         },
       });
       if (error) throw error;

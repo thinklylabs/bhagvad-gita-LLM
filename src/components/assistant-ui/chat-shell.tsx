@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuiState, ThreadListItemPrimitive, ThreadListPrimitive } from "@assistant-ui/react";
 import type { Session } from "@supabase/supabase-js";
 import { Thread } from "@/components/assistant-ui/thread";
@@ -29,8 +30,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SquarePen, MessageSquare, MoreHorizontal, Trash2, Archive, LogOut, ChevronUp } from "lucide-react";
+import { SquarePen, MessageSquare, MoreHorizontal, Trash2, Archive, LogOut, ChevronUp, Settings } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useEffect, type ReactNode } from "react";
 
 // Shows a pulsing dot only on the specific thread item that is both active AND currently generating.
 function RunningIndicator() {
@@ -49,6 +51,12 @@ function RunningIndicator() {
 // ─── Single conversation item ─────────────────────────────────────────────────
 
 function ConversationItem() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const threadId = useAuiState(
+    (s) => (s.threadListItem as { id?: string }).id ?? ""
+  );
+
   return (
     <SidebarMenuItem>
       <ThreadListItemPrimitive.Root className="w-full">
@@ -56,6 +64,22 @@ function ConversationItem() {
           <SidebarMenuButton
             className="w-full data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
             tooltip="Open conversation"
+            data-thread-id={threadId}
+            onClick={() => {
+              if (threadId) {
+                window.dispatchEvent(
+                  new CustomEvent("gita:thread-open-start", {
+                    detail: { threadId },
+                  })
+                );
+              }
+              if (pathname !== "/dashboard") {
+                if (threadId) {
+                  window.sessionStorage.setItem("pendingThreadId", threadId);
+                }
+                router.push("/dashboard");
+              }
+            }}
           >
             <MessageSquare className="shrink-0" />
             <span className="truncate">
@@ -98,7 +122,13 @@ function ConversationItem() {
 
 // ─── Sidebar content ──────────────────────────────────────────────────────────
 
-function GitaSidebar({ session }: { session: Session }) {
+function GitaSidebar({
+  session,
+  showThreads = true,
+}: {
+  session: Session;
+  showThreads?: boolean;
+}) {
   const handleSignOut = async () => {
     const supabase = getBrowserSupabase();
     await supabase.auth.signOut();
@@ -128,34 +158,42 @@ function GitaSidebar({ session }: { session: Session }) {
             </span>
           </Link>
 
-          <ThreadListPrimitive.New asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              title="New conversation"
-            >
-              <SquarePen className="h-4 w-4" />
-              <span className="sr-only">New conversation</span>
-            </Button>
-          </ThreadListPrimitive.New>
+          {showThreads ? (
+            <ThreadListPrimitive.New asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                title="New conversation"
+              >
+                <SquarePen className="h-4 w-4" />
+                <span className="sr-only">New conversation</span>
+              </Button>
+            </ThreadListPrimitive.New>
+          ) : (
+            <div className="h-8 w-8" />
+          )}
         </div>
       </SidebarHeader>
 
       {/* Conversations list */}
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/50 px-2 py-1">
-            Conversations
-          </SidebarGroupLabel>
-          <SidebarMenu>
-            <ThreadListPrimitive.Root>
-              <ThreadListPrimitive.Items
-                components={{ ThreadListItem: ConversationItem }}
-              />
-            </ThreadListPrimitive.Root>
-          </SidebarMenu>
-        </SidebarGroup>
+        {showThreads ? (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/50 px-2 py-1">
+              Conversations
+            </SidebarGroupLabel>
+            <SidebarMenu>
+              <ThreadListPrimitive.Root>
+                <ThreadListPrimitive.Items
+                  components={{ ThreadListItem: ConversationItem }}
+                />
+              </ThreadListPrimitive.Root>
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : (
+          <div />
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-2">
@@ -186,6 +224,12 @@ function GitaSidebar({ session }: { session: Session }) {
                 align="end"
                 sideOffset={4}
               >
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-stone-800">
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-stone-800"
                   onClick={handleSignOut}
@@ -208,18 +252,67 @@ function GitaSidebar({ session }: { session: Session }) {
 
 export function ChatShell({ session }: { session: Session }) {
   return (
+    <AppShell session={session}>
+      <Thread />
+    </AppShell>
+  );
+}
+
+export function AppShell({
+  session,
+  children,
+  title,
+  showThreads = true,
+  headerContent,
+}: {
+  session: Session;
+  children: ReactNode;
+  title?: string;
+  showThreads?: boolean;
+  headerContent?: ReactNode;
+}) {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname !== "/dashboard") return;
+
+    const pendingThreadId = window.sessionStorage.getItem("pendingThreadId");
+    if (!pendingThreadId) return;
+
+    let tries = 0;
+    const maxTries = 12;
+    const interval = window.setInterval(() => {
+      const trigger = document.querySelector<HTMLElement>(
+        `[data-thread-id="${pendingThreadId}"]`
+      );
+      if (trigger) {
+        trigger.click();
+        window.sessionStorage.removeItem("pendingThreadId");
+        window.clearInterval(interval);
+        return;
+      }
+      tries += 1;
+      if (tries >= maxTries) {
+        window.clearInterval(interval);
+      }
+    }, 150);
+
+    return () => window.clearInterval(interval);
+  }, [pathname]);
+
+  return (
     <SidebarProvider defaultOpen>
-      <GitaSidebar session={session} />
+      <GitaSidebar session={session} showThreads={showThreads} />
       <SidebarInset className="flex h-screen min-h-0 flex-col bg-stone-950">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-stone-800/60 px-4">
           <SidebarTrigger className="-ml-1 text-stone-400 hover:bg-stone-800 hover:text-stone-200" />
           <Separator orientation="vertical" className="h-5 bg-stone-800" />
-          <span className="text-sm font-medium text-stone-400">Gita AI</span>
+          {headerContent ?? (title ? (
+            <span className="text-sm font-medium text-stone-400">{title}</span>
+          ) : null)}
         </header>
 
-        <div className="relative min-h-0 flex-1">
-          <Thread />
-        </div>
+        <div className="relative min-h-0 flex-1">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );
